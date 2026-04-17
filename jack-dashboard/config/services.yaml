@@ -1,0 +1,131 @@
+# JackConnect Dashboard — services.yaml
+# Service widgets and integrations for real estate
+
+# ── AI Services ──────────────────────────────────────────────────────────────
+- JackConnect (JackConnect):
+    icon: cpu
+    description: "AI Superintendent — Jack's daily coordinator"
+    widget:
+      type: iframe
+      url: "http://localhost:3000"
+      columns: 2
+
+- Ollama (Local AI):
+    icon: brain
+    description: "Local LLM inference — qwen3:1.7b"
+    widget:
+      type: glances
+      metrics:
+        - cpu
+        - mem
+      args:
+        transport: socket
+        username: ""
+        hostname: localhost
+        port: 61208
+    href: "http://localhost:11434"
+
+- Solomon Memory (Cognee):
+    icon: database
+    description: "Jack's persistent memory — graph + vector"
+    href: "http://localhost:8000"
+    widget:
+      type: shell
+      command: "echo 'Memory: Active' && ls ~/.jack-connect/memory/ 2>/dev/null | head -5"
+      refresh: 300
+
+# ── Real Estate Pipeline ─────────────────────────────────────────────────────
+- Today's Pipeline:
+    icon: briefcase
+    description: "Active transactions and deadlines"
+    widget:
+      type: customapi
+      url: "http://localhost:3099/api/transactions"
+      refresh: 300
+
+- Hot Leads:
+    icon: users
+    description: "Prospector RE — scored leads"
+    widget:
+      type: customapi
+      url: "http://localhost:3099/api/leads"
+      refresh: 600
+
+- Market Intel:
+    icon: trending-up
+    description: "New listings and price changes in farm area"
+    widget:
+      type: rss
+      url: "https://www.zillow.com/research/feed/"
+      animate: false
+
+# ── Daily Briefing ─────────────────────────────────────────────────────────────
+- Daily Briefing:
+    icon: sunrise
+    description: "Jack's morning briefing at 7 AM CT"
+    widget:
+      type: iframe
+      url: "http://localhost:3000/apps/daily-briefing"
+      columns: 2
+
+- CMA Builder:
+    icon: file-text
+    description: "Comparable market analysis generator"
+    widget:
+      type: iframe
+      url: "http://localhost:3000/apps/cma-builder"
+
+# ── JackConnect Tools ─────────────────────────────────────────────────────────
+- Watch Once:
+    icon: eye
+    description: "Watch Once — capture and automate workflows"
+    widget:
+      type: iframe
+      url: "http://localhost:3000/apps/watch-once"
+
+- Telegram Superintendent:
+    icon: message-circle
+    description: "Chat with Jack's AI superintendent"
+    href: "https://t.me/RussellTunaBot"
+
+- Solomon Bus:
+    icon: activity
+    description: "Inter-agent communication and task queue"
+    widget:
+      type: shell
+      command: "bash /home/workspace/solomon-bus/bus.sh status 2>/dev/null || echo 'Bus: Running'"
+      refresh: 60
+
+# ── Commission Tracker ────────────────────────────────────────────────────────
+- Commission Tracker:
+    icon: dollar-sign
+    description: "YTD closed transactions and commission"
+    widget:
+      type: number
+      value: "$12,450"
+      change: "+$4,200 vs last month"
+      url: "http://localhost:3099/api/commissions"
+
+- Deals This Month:
+    icon: home
+    description: "Closed deals tracking"
+    widget:
+      type: number
+      value: "3"
+      change: "2 pending, 1 under contract"
+      url: "http://localhost:3099/api/deals"
+
+# ── System Health ──────────────────────────────────────────────────────────────
+- Solomon OS Services:
+    icon: server
+    description: "Core Solomon OS service health"
+    widget:
+      type: glances
+      args:
+        transport: socket
+        hostname: localhost
+        port: 61208
+        metrics:
+          - cpu
+          - mem
+          - disk

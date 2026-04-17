@@ -1,0 +1,56 @@
+# JackConnect Dashboard — settings.yaml
+# Customize your homepage appearance
+
+theme: dark
+color: blue
+
+title: "JackConnect"
+header: 
+  logo: "🏠"
+  title: "Jack Vanleur | Alpine Real Estate"
+  language: en
+
+bookmarks:
+  - Real Estate:
+      - name: "MLS Portal"
+        url: "https://www.sd MLS portal here"
+        icon: "building"
+      - name: "Alpine RE Website"
+        url: "https://alpinerealestate.com"
+        icon: "home"
+      - name: "Zillow"
+        url: "https://www.zillow.com"
+        icon: "search"
+      - name: "Realtor.com"
+        url: "https://www.realtor.com"
+        icon: "map"
+  - JackConnect:
+      - name: "Solomon OS"
+        url: "https://josephv.zo.space/solomon"
+        icon: "cpu"
+      - name: "JackConnect Cabinet"
+        url: "http://localhost:3000"
+        icon: "brain"
+      - name: "CMA Builder"
+        url: "http://localhost:3000/apps/cma-builder"
+        icon: "file-text"
+      - name: "Daily Briefing"
+        url: "http://localhost:3000/apps/daily-briefing"
+        icon: "sun"
+  - Tools:
+      - name: "Telegram"
+        url: "https://web.telegram.org"
+        icon: "send"
+      - name: "Google Calendar"
+        url: "https://calendar.google.com"
+        icon: "calendar"
+      - name: "Jack's Email"
+        url: "https://mail.google.com"
+        icon: "mail"
+
+layout:
+  desktop:
+    style: "grid"
+    columns: 3
+  mobile:
+    style: "column"

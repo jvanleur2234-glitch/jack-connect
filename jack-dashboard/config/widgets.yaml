@@ -1,0 +1,46 @@
+# JackConnect Dashboard — widgets.yaml
+# Custom widgets for real estate metrics
+
+- resources:
+    cpugraph:
+      density: normal
+    memorygraph:
+      useBit: false
+    diskgraph:
+      hideFreespace: false
+      hideFsTypes: []
+      hideDisks: []
+    networkgraph:
+      interfaces: []
+      logarithmic: false
+
+- actions:
+    - name: "📋 Open Pipeline"
+      icon: briefcase
+      href: "http://localhost:3000/apps/pipeline"
+    - name: "📞 Call Lead"
+      icon: phone
+      command: "echo 'Calling next hot lead...'"
+    - name: "📧 Send CMA"
+      icon: mail
+      href: "http://localhost:3000/apps/cma-builder"
+
+- datetime:
+    textSize: xl
+    textColor: rose
+    showRelative: true
+    format: "dddd, MMMM Do YYYY, h:mm:ss A"
+    timeSize: xl
+    timeColor: emerald
+
+- weather:
+    provider: openweathermap
+    apiKey: "ENV:OPENWEATHERMAP_API_KEY"
+    units: imperial
+    location: "Sioux Falls, SD"
+    view: "icons"
+    animated: true
+
+- search:
+    provider: google
+    target: "_blank"
