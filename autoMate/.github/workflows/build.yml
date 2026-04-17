@@ -1,0 +1,167 @@
+name: Build & Release
+
+# ── 使用方式 ──────────────────────────────────────────────────────────────
+# 在 GitHub Actions 页面点击 "Run workflow"，填写版本号（如 1.2.0）即可。
+# 工作流会自动：
+#   1. 创建 git tag (v1.2.0)
+#   2. 三平台并行打包 (Windows / macOS / Linux)
+#   3. 发布 GitHub Release，附带各平台安装包
+# ─────────────────────────────────────────────────────────────────────────
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号，例如 1.2.0（不需要加 v 前缀）'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  # ── 1. 创建 git tag ───────────────────────────────────────────────────
+  tag:
+    name: Create tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.create.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create and push tag
+        id: create
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const raw = '${{ inputs.version }}'.trim()
+            const tag = raw.startsWith('v') ? raw : `v${raw}`
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/${tag}`,
+              sha: context.sha,
+            })
+            core.setOutput('tag', tag)
+            console.log(`✅ Created tag: ${tag}`)
+
+  # ── 2. 三平台并行构建 ─────────────────────────────────────────────────
+  build:
+    name: Build · ${{ matrix.name }}
+    needs: tag
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: windows-x64
+            ext: zip
+          - os: macos-latest
+            name: macos-arm64
+            ext: zip
+          - os: ubuntu-22.04
+            name: linux-x64
+            ext: tar.gz
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y xclip xdotool libxcb-xinerama0 libxcb-cursor0 libxkbcommon-x11-0 libgl1
+
+      - name: Install PyTorch (CPU-only)
+        run: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install project dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install PyInstaller
+        run: pip install "pyinstaller>=6.0"
+
+      - name: Build with PyInstaller
+        run: pyinstaller main.spec --noconfirm
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path dist\autoMate -DestinationPath autoMate-${{ matrix.name }}.${{ matrix.ext }}
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          if [ -d "autoMate.app" ]; then
+            zip -r ../autoMate-${{ matrix.name }}.${{ matrix.ext }} autoMate.app
+          else
+            zip -r ../autoMate-${{ matrix.name }}.${{ matrix.ext }} autoMate
+          fi
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: tar -czf autoMate-${{ matrix.name }}.${{ matrix.ext }} -C dist autoMate
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: autoMate-${{ matrix.name }}
+          path: autoMate-${{ matrix.name }}.${{ matrix.ext }}
+          retention-days: 7
+
+  # ── 3. 发布 GitHub Release ────────────────────────────────────────────
+  release:
+    name: Publish Release
+    needs: [tag, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "autoMate ${{ needs.tag.outputs.tag }}"
+          tag_name: ${{ needs.tag.outputs.tag }}
+          files: |
+            artifacts/autoMate-windows-x64/autoMate-windows-x64.zip
+            artifacts/autoMate-macos-arm64/autoMate-macos-arm64.zip
+            artifacts/autoMate-linux-x64/autoMate-linux-x64.tar.gz
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(needs.tag.outputs.tag, '-alpha') || contains(needs.tag.outputs.tag, '-beta') || contains(needs.tag.outputs.tag, '-rc') }}
+          body: |
+            ## 📦 下载安装
+
+            | 平台 | 文件 |
+            |------|------|
+            | Windows x64 | `autoMate-windows-x64.zip` |
+            | macOS Apple Silicon (M1/M2/M3) | `autoMate-macos-arm64.zip` |
+            | Linux x64 | `autoMate-linux-x64.tar.gz` |
+
+            ### Windows
+            1. 解压 `autoMate-windows-x64.zip`
+            2. 运行 `autoMate\autoMate.exe`
+
+            ### macOS
+            1. 解压 zip
+            2. 右键 → 打开 `autoMate.app`（首次需右键绕过 Gatekeeper）
+            3. 在系统设置 → 隐私与安全性 中授予**辅助功能**和**屏幕录制**权限
+
+            ### Linux
+            1. 解压：`tar xzf autoMate-linux-x64.tar.gz`
+            2. 运行：`./autoMate/autoMate`
+            3. 如需剪贴板支持：`sudo apt install xclip`
+
+            ---
+            > 首次启动会自动下载模型权重（~50 MB），请在设置中填写 LLM API Key。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

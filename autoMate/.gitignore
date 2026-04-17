@@ -1,0 +1,10 @@
+**/__pycache__/
+weights/
+.conda/
+.venv/
+tmp/
+# PyInstaller output directories (root-level only)
+/build/
+/dist/
+# macOS
+.DS_Store

@@ -1,0 +1,89 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# data: keep only the shipped templates, agent library, and guidance tracked
+data/**
+!data/
+!data/.cabinet
+!data/getting-started/
+!data/getting-started/**
+!data/example-cabinet-carousel-factory/
+!data/example-cabinet-carousel-factory/**
+!data/example-text-your-mom/
+!data/example-text-your-mom/**
+!data/vc-os/
+!data/vc-os/**
+data/vc-os/.cabinet-state/*
+!data/vc-os/.cabinet-state/.gitkeep
+data/vc-os/.agents/.conversations/
+data/vc-os/.agents/.messages/
+data/vc-os/.agents/.memory/
+data/vc-os/.agents/.history/
+data/vc-os/deal-flow/.cabinet-state/*
+!data/vc-os/deal-flow/.cabinet-state/.gitkeep
+data/vc-os/deal-flow/.agents/.conversations/
+data/vc-os/portfolio/.cabinet-state/*
+!data/vc-os/portfolio/.cabinet-state/.gitkeep
+data/vc-os/portfolio/.agents/.conversations/
+data/vc-os/intelligence/.cabinet-state/*
+!data/vc-os/intelligence/.cabinet-state/.gitkeep
+data/vc-os/intelligence/.agents/.conversations/
+data/vc-os/intelligence/.agents/.messages/
+data/vc-os/intelligence/.agents/.memory/
+data/vc-os/intelligence/.agents/.history/
+!data/index.md
+!data/CLAUDE.md
+data/**/.DS_Store
+
+# old data backup
+/old-data/
+
+# claude code
+.claude/
+
+# stray build artifacts
+data/.agents/.library/.next/
+
+# cabinetai CLI
+cabinetai/dist/
+cabinetai/node_modules/

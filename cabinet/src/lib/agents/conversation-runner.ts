@@ -1,0 +1,464 @@
+import path from "path";
+import type { JobConfig, JobRun, JobPostAction } from "@/types/jobs";
+import type { ConversationMeta } from "@/types/conversations";
+import { readPage } from "../storage/page-io";
+import { DATA_DIR } from "../storage/path-utils";
+import {
+  defaultAdapterTypeForProvider,
+  resolveExecutionProviderId,
+} from "./adapters";
+import {
+  appendConversationTranscript,
+  createConversation,
+  finalizeConversation,
+  readConversationMeta,
+} from "./conversation-store";
+import { createDaemonSession, getDaemonSessionOutput } from "./daemon-client";
+import { readLibraryPersona } from "./library-manager";
+import { readPersona, type AgentPersona } from "./persona-manager";
+import { getDefaultProviderId } from "./provider-runtime";
+
+export interface ConversationCompletion {
+  meta: ConversationMeta;
+  output: string;
+  status: "completed" | "failed";
+}
+
+interface StartConversationInput {
+  agentSlug: string;
+  title: string;
+  trigger: ConversationMeta["trigger"];
+  prompt: string;
+  providerId?: string;
+  adapterType?: string;
+  adapterConfig?: Record<string, unknown>;
+  mentionedPaths?: string[];
+  jobId?: string;
+  jobName?: string;
+  cabinetPath?: string;
+  cwd?: string;
+  timeoutSeconds?: number;
+  onComplete?: (completion: ConversationCompletion) => Promise<void> | void;
+}
+
+function buildCabinetEpilogueInstructions(): string {
+  return [
+    "At the end of your response, include a ```cabinet block with these fields:",
+    "SUMMARY: one short summary line",
+    "CONTEXT: optional lightweight memory/context summary",
+    "ARTIFACT: relative/path/to/file for every KB file you created or updated",
+  ].join("\n");
+}
+
+function buildKnowledgeBaseScopeInstructions(
+  baseCwd: string,
+  cabinetPath?: string
+): string[] {
+  if (cabinetPath) {
+    return [
+      `Work only inside the cabinet-scoped knowledge base rooted at /data/${cabinetPath}.`,
+      `For local filesystem work, treat ${baseCwd} as the root for this run.`,
+      "Do not create or modify files in sibling cabinets or the global /data root unless the user explicitly asks.",
+    ];
+  }
+
+  return [
+    "Work in the Cabinet knowledge base rooted at /data.",
+    `For local filesystem work, treat ${baseCwd} as the root for this run.`,
+  ];
+}
+
+function buildDiagramOutputInstructions(): string[] {
+  return [
+    "If you create Mermaid diagrams, make sure the source is renderable.",
+    "Prefer Mermaid edge labels like `A -->|label| B` or `A -.->|label| B` instead of mixed forms such as `A -- \"label\" --> B`.",
+  ];
+}
+
+function buildAgentContextHeader(persona: AgentPersona | null, agentSlug: string): string {
+  if (!persona) {
+    return [
+      "You are Cabinet's General agent.",
+      "Handle the request directly and use the knowledge base as your working area.",
+    ].join("\n");
+  }
+
+  return [
+    persona.body,
+    "",
+    `You are working as ${persona.name} (${agentSlug}).`,
+  ].join("\n");
+}
+
+function makeTitle(text: string): string {
+  const firstLine = text.split("\n").map((line) => line.trim()).find(Boolean) || "New conversation";
+  return firstLine.slice(0, 80);
+}
+
+async function buildMentionContext(mentionedPaths: string[]): Promise<string> {
+  if (mentionedPaths.length === 0) return "";
+
+  const chunks = await Promise.all(
+    mentionedPaths.map(async (pagePath) => {
+      try {
+        const page = await readPage(pagePath);
+        return `--- ${page.frontmatter.title} (${pagePath}) ---\n${page.content}`;
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const valid = chunks.filter(Boolean);
+  if (valid.length === 0) return "";
+
+  return `\n\nReferenced pages:\n${valid.join("\n\n")}`;
+}
+
+export async function buildManualConversationPrompt(input: {
+  agentSlug: string;
+  userMessage: string;
+  mentionedPaths?: string[];
+  cabinetPath?: string;
+}): Promise<{
+  prompt: string;
+  title: string;
+  cwd?: string;
+  adapterType: string;
+  adapterConfig?: Record<string, unknown>;
+  providerId: string;
+  cabinetPath?: string;
+}> {
+  const persona = input.agentSlug === "general"
+    ? null
+    : await readPersona(input.agentSlug, input.cabinetPath);
+  const mentionContext = await buildMentionContext(input.mentionedPaths || []);
+  const baseCwd = input.cabinetPath ? path.join(DATA_DIR, input.cabinetPath) : DATA_DIR;
+  const cwd =
+    persona?.workdir && persona.workdir !== "/data"
+      ? `${DATA_DIR}/${persona.workdir.replace(/^\/+/, "")}`
+      : baseCwd;
+
+  const prompt = [
+    buildAgentContextHeader(persona, input.agentSlug),
+    "",
+    ...buildKnowledgeBaseScopeInstructions(baseCwd, input.cabinetPath),
+    "Reflect useful outputs in KB files, not only in terminal text.",
+    ...buildDiagramOutputInstructions(),
+    buildCabinetEpilogueInstructions(),
+    "",
+    `User request:\n${input.userMessage}${mentionContext}`,
+  ].join("\n");
+
+  const defaultProviderId = getDefaultProviderId();
+
+  return {
+    prompt,
+    title: makeTitle(input.userMessage),
+    cwd,
+    adapterType:
+      persona?.adapterType ||
+      defaultAdapterTypeForProvider(
+        resolveExecutionProviderId({
+          adapterType: persona?.adapterType,
+          providerId: persona?.provider,
+          defaultProviderId,
+        })
+      ),
+    adapterConfig: persona?.adapterConfig,
+    providerId: resolveExecutionProviderId({
+      adapterType: persona?.adapterType,
+      providerId: persona?.provider,
+      defaultProviderId,
+    }),
+    cabinetPath: input.cabinetPath,
+  };
+}
+
+export async function buildEditorConversationPrompt(input: {
+  pagePath: string;
+  userMessage: string;
+  mentionedPaths?: string[];
+  cabinetPath?: string;
+}): Promise<{
+  prompt: string;
+  title: string;
+  cwd?: string;
+  mentionedPaths: string[];
+  adapterType: string;
+  adapterConfig?: Record<string, unknown>;
+  providerId: string;
+}> {
+  const persona =
+    (await readPersona("editor", input.cabinetPath)) ||
+    (await readPersona("editor")) ||
+    (await readLibraryPersona("editor", input.cabinetPath));
+  const combinedMentionedPaths = Array.from(
+    new Set([input.pagePath, ...(input.mentionedPaths || [])])
+  );
+  const mentionContext = await buildMentionContext(combinedMentionedPaths);
+  const baseCwd = input.cabinetPath ? path.join(DATA_DIR, input.cabinetPath) : DATA_DIR;
+  const cwd =
+    persona?.workdir && persona.workdir !== "/data"
+      ? `${DATA_DIR}/${persona.workdir.replace(/^\/+/, "")}`
+      : baseCwd;
+
+  const prompt = [
+    buildAgentContextHeader(persona, "editor"),
+    "",
+    `You are editing the page at /data/${input.pagePath}.`,
+    `Prefer making the requested changes directly in ${input.pagePath} unless the task clearly belongs in another KB file.`,
+    "Do not assume the target is markdown. Follow the actual file type and Cabinet structure when choosing what to edit.",
+    ...buildKnowledgeBaseScopeInstructions(baseCwd, input.cabinetPath),
+    "Edit KB files directly and reflect useful outputs in the KB, not only in terminal text.",
+    ...buildDiagramOutputInstructions(),
+    buildCabinetEpilogueInstructions(),
+    "",
+    `User request:\n${input.userMessage}${mentionContext}`,
+  ].join("\n");
+
+  const defaultProviderId = getDefaultProviderId();
+
+  return {
+    prompt,
+    title: makeTitle(input.userMessage),
+    cwd,
+    mentionedPaths: combinedMentionedPaths,
+    adapterType:
+      persona?.adapterType ||
+      defaultAdapterTypeForProvider(
+        resolveExecutionProviderId({
+          adapterType: persona?.adapterType,
+          providerId: persona?.provider,
+          defaultProviderId,
+        })
+      ),
+    adapterConfig: persona?.adapterConfig,
+    providerId: resolveExecutionProviderId({
+      adapterType: persona?.adapterType,
+      providerId: persona?.provider,
+      defaultProviderId,
+    }),
+  };
+}
+
+export async function startConversationRun(
+  input: StartConversationInput
+): Promise<ConversationMeta> {
+  const resolvedProviderId = input.providerId || getDefaultProviderId();
+  const resolvedAdapterType =
+    input.adapterType || defaultAdapterTypeForProvider(resolvedProviderId);
+
+  const meta = await createConversation({
+    agentSlug: input.agentSlug,
+    cabinetPath: input.cabinetPath,
+    title: input.title,
+    trigger: input.trigger,
+    prompt: input.prompt,
+    providerId: resolvedProviderId,
+    adapterType: resolvedAdapterType,
+    adapterConfig: input.adapterConfig,
+    mentionedPaths: input.mentionedPaths,
+    jobId: input.jobId,
+    jobName: input.jobName,
+  });
+
+  try {
+    await createDaemonSession({
+      id: meta.id,
+      prompt: input.prompt,
+      providerId: resolvedProviderId,
+      adapterType: resolvedAdapterType,
+      adapterConfig: input.adapterConfig,
+      cwd: input.cwd,
+      timeoutSeconds: input.timeoutSeconds,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to start daemon session";
+    await appendConversationTranscript(meta.id, `${message}\n`);
+    await finalizeConversation(meta.id, {
+      status: "failed",
+      output: message,
+      exitCode: 1,
+    });
+    throw error;
+  }
+
+  if (input.onComplete) {
+    void waitForConversationCompletion(meta.id, input.onComplete);
+  }
+
+  return meta;
+}
+
+export async function waitForConversationCompletion(
+  conversationId: string,
+  onComplete?: (completion: ConversationCompletion) => Promise<void> | void
+): Promise<ConversationCompletion> {
+  const deadline = Date.now() + 15 * 60 * 1000;
+
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    try {
+      const data = await getDaemonSessionOutput(conversationId);
+      if (data.status === "running") {
+        continue;
+      }
+
+      const normalizedStatus = data.status === "completed" ? "completed" : "failed";
+      const currentMeta = await readConversationMeta(conversationId);
+      const finalMeta =
+        currentMeta?.status === "running"
+          ? await finalizeConversation(conversationId, {
+              status: normalizedStatus,
+              output: data.output,
+              exitCode: normalizedStatus === "completed" ? 0 : 1,
+            })
+          : currentMeta;
+
+      if (!finalMeta) {
+        throw new Error(`Conversation ${conversationId} disappeared during completion`);
+      }
+
+      const completion = {
+        meta: finalMeta,
+        output: data.output,
+        status: normalizedStatus,
+      } satisfies ConversationCompletion;
+
+      if (onComplete) {
+        await onComplete(completion);
+      }
+
+      return completion;
+    } catch {
+      // Retry until timeout. The daemon can briefly 404 while cleaning up.
+    }
+  }
+
+  const finalMeta = await finalizeConversation(conversationId, {
+    status: "failed",
+    output: "Conversation timed out while waiting for completion.",
+    exitCode: 124,
+  });
+
+  if (!finalMeta) {
+    throw new Error(`Conversation ${conversationId} timed out and no metadata was found`);
+  }
+
+  const completion = {
+    meta: finalMeta,
+    output: "Conversation timed out while waiting for completion.",
+    status: "failed",
+  } satisfies ConversationCompletion;
+
+  if (onComplete) {
+    await onComplete(completion);
+  }
+
+  return completion;
+}
+
+function substituteTemplateVars(text: string, job: JobConfig): string {
+  const now = new Date();
+  return text
+    .replace(/\{\{date\}\}/g, now.toISOString().split("T")[0])
+    .replace(/\{\{datetime\}\}/g, now.toISOString())
+    .replace(/\{\{job\.name\}\}/g, job.name)
+    .replace(/\{\{job\.id\}\}/g, job.id)
+    .replace(/\{\{job\.workdir\}\}/g, job.workdir || "/data");
+}
+
+async function processPostActions(
+  actions: JobPostAction[] | undefined,
+  job: JobConfig
+): Promise<void> {
+  if (!actions || actions.length === 0) return;
+
+  for (const action of actions) {
+    try {
+      if (action.action === "git_commit") {
+        const simpleGit = (await import("simple-git")).default;
+        const git = simpleGit(DATA_DIR);
+        await git.add(".");
+        await git.commit(
+          substituteTemplateVars(
+            action.message || `Job ${job.name} completed {{date}}`,
+            job
+          )
+        );
+      }
+    } catch (error) {
+      console.error(`Post-action ${action.action} failed:`, error);
+    }
+  }
+}
+
+export async function startJobConversation(job: JobConfig): Promise<JobRun> {
+  const persona = job.agentSlug ? await readPersona(job.agentSlug, job.cabinetPath) : null;
+  const defaultProviderId = getDefaultProviderId();
+  const jobPrompt = substituteTemplateVars(job.prompt, job);
+  const baseCwd = job.cabinetPath ? path.join(DATA_DIR, job.cabinetPath) : DATA_DIR;
+  const cwd =
+    job.workdir && job.workdir !== "/data" && job.workdir !== "/"
+      ? path.join(baseCwd, job.workdir.replace(/^\/+/, ""))
+      : persona?.workdir && persona.workdir !== "/data" && persona.workdir !== "/"
+        ? path.join(baseCwd, persona.workdir.replace(/^\/+/, ""))
+        : baseCwd;
+
+  const prompt = [
+    buildAgentContextHeader(persona, job.agentSlug || "agent"),
+    "",
+    "This is a scheduled or manual Cabinet job.",
+    ...buildKnowledgeBaseScopeInstructions(baseCwd, job.cabinetPath),
+    "Reflect the results in KB files whenever useful.",
+    ...buildDiagramOutputInstructions(),
+    buildCabinetEpilogueInstructions(),
+    "",
+    `Job instructions:\n${jobPrompt}`,
+  ].join("\n");
+
+  const meta = await startConversationRun({
+    agentSlug: job.agentSlug || "agent",
+    title: job.name,
+    trigger: "job",
+    prompt,
+    adapterType:
+      job.adapterType ||
+      persona?.adapterType ||
+      defaultAdapterTypeForProvider(
+        resolveExecutionProviderId({
+          adapterType: job.adapterType || persona?.adapterType,
+          providerId: job.provider || persona?.provider,
+          defaultProviderId,
+        })
+      ),
+    adapterConfig: job.adapterConfig || persona?.adapterConfig,
+    providerId: resolveExecutionProviderId({
+      adapterType: job.adapterType || persona?.adapterType,
+      providerId: job.provider || persona?.provider,
+      defaultProviderId,
+    }),
+    jobId: job.id,
+    jobName: job.name,
+    cabinetPath: job.cabinetPath,
+    cwd,
+    timeoutSeconds: job.timeout || 600,
+    onComplete: async (completion) => {
+      if (completion.status === "completed") {
+        await processPostActions(job.on_complete, job);
+      } else {
+        await processPostActions(job.on_failure, job);
+      }
+    },
+  });
+
+  return {
+    id: meta.id,
+    jobId: job.id,
+    status: "running",
+    startedAt: meta.startedAt,
+    output: "",
+  };
+}

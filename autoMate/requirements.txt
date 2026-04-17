@@ -1,0 +1,31 @@
+# Vision / ML (optional — required for OmniParser UI detection)
+# torch
+# torchvision
+supervision==0.18.0
+ultralytics==8.3.70
+numpy==1.26.4
+timm
+einops==0.8.0
+modelscope
+
+# Screen control
+pyautogui==0.9.54
+pynput
+pyperclip
+keyboard==0.13.5
+
+# LLM clients
+anthropic[bedrock,vertex]>=0.37.1
+# OpenAI-compatible SDK — OpenAI, Azure, OpenRouter, Groq, Ollama, DeepSeek, etc.
+openai>=1.50.0
+
+# MCP server
+mcp[cli]>=1.0.0
+
+# CLI
+click>=8.0
+rich>=13.0
+
+# Script serialization
+pyyaml>=6.0
+pydantic>=2.0
