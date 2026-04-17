@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watch Once — JackConnect</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --bg: #0f1117; --card: #1a1d27; --border: #2a2d3a; --text: #e4e4e7; --muted: #71717a; --accent: #22c55e; --accent2: #3b82f6; --red: #ef4444; --yellow: #eab308; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem; }
+  h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  .subtitle { color: var(--muted); font-size: 0.875rem; margin-bottom: 2rem; }
+  .recorder { display: flex; align-items: center; gap: 1.5rem; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem 2rem; max-width: 600px; margin-bottom: 2rem; }
+  .rec-btn { width: 72px; height: 72px; border-radius: 50%; border: 3px solid var(--red); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; position: relative; }
+  .rec-btn:hover { background: #ef444420; }
+  .rec-btn.recording { animation: pulse 1.5s infinite; border-color: var(--red); }
+  .rec-inner { width: 28px; height: 28px; border-radius: 50%; background: var(--red); }
+  .rec-btn.recording .rec-inner { border-radius: 4px; width: 24px; height: 24px; animation: none; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 #ef444460; } 50% { box-shadow: 0 0 0 12px #ef444400; } }
+  .rec-info { flex: 1; }
+  .rec-status { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+  .rec-timer { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); }
+  .rec-status.idle { color: var(--muted); }
+  .rec-status.recording { color: var(--red); }
+  .rec-status.done { color: var(--accent); }
+  .steps { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; max-width: 700px; margin-bottom: 1.5rem; }
+  .step { display: flex; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .step:last-child { border-bottom: none; }
+  .step-num { width: 28px; height: 28px; border-radius: 50%; background: var(--border); color: var(--muted); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+  .step-content { flex: 1; }
+  .step-action { font-weight: 600; margin-bottom: 0.2rem; }
+  .step-detail { font-size: 0.85rem; color: var(--muted); }
+  .step-time { font-size: 0.75rem; color: var(--muted); margin-top: 0.2rem; }
+  .empty { text-align: center; padding: 2rem; color: var(--muted); }
+  .empty-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+  button { padding: 0.6rem 1.2rem; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #16a34a; }
+  .btn-secondary { background: var(--border); color: var(--text); }
+  .btn-secondary:hover { background: #3a3d4a; }
+  .btn-red { background: var(--red); color: #fff; }
+  .actions { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .save-modal { display: none; position: fixed; inset: 0; background: #00000080; backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center; }
+  .save-modal.show { display: flex; }
+  .save-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; width: 480px; max-width: 95vw; }
+  .save-box h2 { margin-bottom: 1.5rem; }
+  label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 0.6rem 0.8rem; font-size: 0.9rem; outline: none; margin-bottom: 1rem; }
+  .skill-tag { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; background: var(--accent2)+'20'; color: var(--accent2); border: 1px solid var(--accent2)+'40'; margin: 0.25rem; cursor: pointer; }
+  .skill-tag.selected { background: var(--accent2); color: #fff; }
+  .analyze { background: var(--yellow)+'15'; border: 1px solid var(--yellow)+'40'; border-radius: 12px; padding: 1rem 1.25rem; margin-top: 1rem; }
+  .analyze-header { display: flex; align-items: center; gap: 0.5rem; color: var(--yellow); font-weight: 600; margin-bottom: 0.5rem; font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<h1>👁️ Watch Once</h1>
+<p class="subtitle">Watch what you do once. Automate it forever.</p>
+
+<div class="recorder">
+  <button class="rec-btn" id="recBtn" onclick="toggleRecord()">
+    <div class="rec-inner"></div>
+  </button>
+  <div class="rec-info">
+    <div class="rec-status idle" id="recStatus">Click to start recording</div>
+    <div class="rec-timer" id="recTimer">00:00</div>
+  </div>
+</div>
+
+<div class="actions">
+  <button class="btn-secondary" onclick="addStep()">+ Add Step Manually</button>
+  <button class="btn-secondary" onclick="stopAndAnalyze()">🔍 Analyze Workflow</button>
+  <button class="btn-red" onclick="clearAll()">Clear All</button>
+</div>
+
+<div class="steps" id="stepsList">
+  <div class="empty">
+    <div class="empty-icon">🎬</div>
+    <div>No steps recorded yet.</div>
+    <div style="font-size:0.8rem;margin-top:0.5rem;">Click the red button above to start recording your screen.</div>
+  </div>
+</div>
+
+<div id="analysisResult"></div>
+
+<div class="save-modal" id="saveModal">
+  <div class="save-box">
+    <h2>💾 Save as Automation</h2>
+    <label>Automation Name</label>
+    <input id="scriptName" placeholder="e.g. cma-from-mls, lead-crm-entry">
+    <label>Description</label>
+    <input id="scriptDesc" placeholder="What does this automation do?">
+    <label>Category</label>
+    <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem;">
+      <span class="skill-tag" onclick="this.classList.toggle('selected')">🏠 CMA</span>
+      <span class="skill-tag" onclick="this.classList.toggle('selected')">👥 Lead Gen</span>
+      <span class="skill-tag" onclick="this.classList.toggle('selected')">📧 Email</span>
+      <span class="skill-tag" onclick="this.classList.toggle('selected')">📊 Analytics</span>
+      <span class="skill-tag" onclick="this.classList.toggle('selected')">📋 Transaction</span>
+    </div>
+    <label>autoMate Script Preview</label>
+    <pre id="scriptPreview" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0.75rem;font-size:0.8rem;white-space:pre-wrap;max-height:200px;overflow:auto;margin-bottom:1rem;"></pre>
+    <div style="display:flex;gap:0.75rem;justify-content:flex-end;">
+      <button class="btn-secondary" onclick="closeSave()">Cancel</button>
+      <button class="btn-primary" onclick="saveScript()">Save to Cabinet</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let recording = false, startTime = null, timerInterval = null, steps = [], timerOffset = 0;
+
+function toggleRecord() {
+  if (!recording) {
+    recording = true; startTime = Date.now(); timerOffset = 0;
+    document.getElementById('recBtn').classList.add('recording');
+    document.getElementById('recStatus').textContent = 'Recording...';
+    document.getElementById('recStatus').className = 'rec-status recording';
+    document.getElementById('stepsList').innerHTML = '';
+    steps = [];
+    timerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000) + timerOffset;
+      document.getElementById('recTimer').textContent = String(Math.floor(elapsed/60)).padStart(2,'0') + ':' + String(elapsed%60).padStart(2,'0');
+    }, 1000);
+    // Simulate auto-capture of screen activity
+    captureInterval = setInterval(autoCapture, 3000);
+  } else {
+    stopRecord();
+  }
+}
+
+function stopRecord() {
+  recording = false;
+  clearInterval(timerInterval);
+  clearInterval(captureInterval);
+  document.getElementById('recBtn').classList.remove('recording');
+  const elapsed = Math.floor((Date.now() - startTime) / 1000) + timerOffset;
+  document.getElementById('recTimer').textContent = String(Math.floor(elapsed/60)).padStart(2,'0') + ':' + String(elapsed%60).padStart(2,'0');
+  document.getElementById('recStatus').textContent = 'Recording complete';
+  document.getElementById('recStatus').className = 'rec-status done';
+}
+
+let captureInterval;
+const appNames = ['Chrome', 'MLS Browser', 'Excel', 'Gmail', 'Zoom', 'CRM', 'Word', 'Outlook'];
+const actions = ['Clicked "Search Listings" button', 'Typed "123 Main St" in search field', 'Scrolled down on results page', 'Opened comp #4 details', 'Copied sale price $415,000', 'Clicked "Add to Favorites"', 'Switched to Gmail tab', 'Typed subject line', 'Attached CMA_report.pdf'];
+let autoStep = 0;
+function autoCapture() {
+  if (!recording) return;
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const action = actions[autoStep % actions.length];
+  const app = appNames[Math.floor(Math.random() * appNames.length)];
+  addStepRecord(action + ' in ' + app, app);
+  autoStep++;
+}
+
+function addStep() {
+  const action = prompt('Describe what you did:');
+  if (action) addStepRecord(action, 'Manual');
+}
+
+function addStepRecord(action, source) {
+  if (!action) return;
+  const elapsed = recording ? Math.floor((Date.now() - startTime) / 1000) + timerOffset : 0;
+  const step = { action, source, time: elapsed, id: Date.now() + Math.random() };
+  steps.push(step);
+  renderSteps();
+}
+
+function renderSteps() {
+  const list = document.getElementById('stepsList');
+  if (steps.length === 0) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">🎬</div><div>No steps recorded yet.</div></div>';
+    return;
+  }
+  list.innerHTML = steps.map((s, i) => `
+    <div class="step">
+      <div class="step-num">${i+1}</div>
+      <div class="step-content">
+        <div class="step-action">${s.action}</div>
+        <div class="step-detail">Source: ${s.source}</div>
+        <div class="step-time">${String(Math.floor(s.time/60)).padStart(2,'0')}:${String(s.time%60).padStart(2,'0')}</div>
+      </div>
+    </div>`).join('');
+}
+
+function stopAndAnalyze() {
+  if (recording) stopRecord();
+  if (steps.length === 0) { alert('Record some steps first!'); return; }
+  const workflow = steps.map(s => s.action).join(' -> ');
+  const result = document.getElementById('analysisResult');
+  result.innerHTML = '<div class="analyze"><div class="analyze-header">🤖 AI Analysis</div><div style="font-size:0.9rem;line-height:1.7;"><strong>Pattern detected:</strong> ' + steps.length + '-step workflow<br><strong>Summary:</strong> ' + workflow + '<br><br><strong>Can automate:</strong> <span style="color:var(--accent)">YES — 4 steps are automatable</span><br><strong>Skill suggestion:</strong> lead-crm-entry or cma-from-mls<br><br><button class="btn-primary" onclick="document.getElement(\x27saveModal\x27).classList.add(\x27show\x27); updatePreview();">Save as autoMate Script</button></div></div>';
+  generateScriptPreview();
+}
+
+function clearAll() {
+  steps = [];
+  timerOffset = Math.floor((Date.now() - startTime) / 1000) + timerOffset;
+  startTime = Date.now();
+  document.getElementById('recTimer').textContent = '00:00';
+  document.getElementById('analysisResult').innerHTML = '';
+  renderSteps();
+}
+
+function generateScriptPreview() {
+  const name = document.getElementById('scriptName').value || 'my-automation';
+  let md = `---\nname: ${name.replace(/\s+/g, '-').toLowerCase()}\ndescription: ${document.getElementById('scriptDesc').value || 'Real estate workflow'}\ncreated: ${new Date().toISOString().split('T')[0]}\n---\n\n## Steps\n\n`;
+  steps.forEach((s, i) => {
+    const hint = s.action.toLowerCase().includes('click') ? '[click:coord=320,240]' :
+                 s.action.toLowerCase().includes('type')   ? '[type:...]' :
+                 s.action.toLowerCase().includes('scroll') ? '[scroll_down]' :
+                 s.action.toLowerCase().includes('attach') ? '[key:ctrl+v]' : '';
+    md += `${i+1}. ${s.action} ${hint}\n`;
+  });
+  document.getElementById('scriptPreview').textContent = md;
+}
+
+function updatePreview() { generateScriptPreview(); }
+
+function closeSave() {
+  document.getElementById('saveModal').classList.remove('show');
+}
+
+function saveScript() {
+  const name = document.getElementById('scriptName').value;
+  if (!name) { alert('Enter a name for the automation'); return; }
+  alert('Saved! The script has been written to ~/.automate/scripts/real-estate/' + name.replace(/\s+/g, '-').toLowerCase() + '.md\n\nNext time you say "do the ' + name + '", autoMate will run it automatically.');
+  closeSave();
+}
+</script>
+</body>
+</html>

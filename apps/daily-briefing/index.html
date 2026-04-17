@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Briefing — JackConnect</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --bg: #0f1117; --card: #1a1d27; --border: #2a2d3a; --text: #e4e4e7; --muted: #71717a; --accent: #22c55e; --accent2: #3b82f6; --red: #ef4444; --yellow: #eab308; --purple: #a855f7; }
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 2rem; }
+  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+  h1 { font-size: 1.75rem; }
+  .greeting { font-size: 0.9rem; color: var(--muted); margin-top: 0.25rem; }
+  .date-badge { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 0.5rem 1rem; text-align: center; }
+  .date-day { font-size: 2rem; font-weight: 800; color: var(--accent); line-height: 1; }
+  .date-month { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; max-width: 1100px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .card-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+  .card-title .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .lead-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--bg); border-radius: 8px; margin-bottom: 0.5rem; cursor: pointer; transition: background 0.15s; }
+  .lead-item:hover { background: #1f2233; }
+  .lead-score { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.85rem; flex-shrink: 0; }
+  .score-high { background: #22c55e20; color: var(--accent); }
+  .score-mid { background: #eab30820; color: var(--yellow); }
+  .score-low { background: #71717a20; color: var(--muted); }
+  .lead-info { flex: 1; min-width: 0; }
+  .lead-name { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lead-detail { font-size: 0.8rem; color: var(--muted); }
+  .lead-action { font-size: 0.75rem; color: var(--accent2); font-weight: 600; white-space: nowrap; }
+  .deal-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+  .deal-item:last-child { border-bottom: none; }
+  .deal-stage { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
+  .stage-offer { background: #22c55e20; color: var(--accent); }
+  .stage-inspect { background: #3b82f620; color: var(--accent2); }
+  .stage-closing { background: #a855f720; color: var(--purple); }
+  .deal-info { flex: 1; }
+  .deal-address { font-size: 0.85rem; font-weight: 600; }
+  .deal-meta { font-size: 0.75rem; color: var(--muted); }
+  .deal-price { font-weight: 700; color: var(--accent); }
+  .action-item { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.5rem 0; }
+  .action-num { width: 22px; height: 22px; border-radius: 6px; background: var(--accent); color: #000; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; flex-shrink: 0; margin-top: 2px; }
+  .action-text { font-size: 0.875rem; line-height: 1.5; }
+  .market-row { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  .market-row:last-child { border-bottom: none; }
+  .market-label { color: var(--muted); }
+  .market-value { font-weight: 600; }
+  .nurture-item { display: flex; gap: 0.75rem; align-items: center; padding: 0.4rem 0; font-size: 0.85rem; }
+  .nurture-icon { font-size: 1.1rem; }
+  .weather { display: flex; align-items: center; gap: 1rem; background: var(--bg); border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+  .weather-icon { font-size: 2.5rem; }
+  .weather-temp { font-size: 2rem; font-weight: 800; }
+  .weather-desc { font-size: 0.85rem; color: var(--muted); }
+  .section-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 1rem 0 0.5rem; }
+  button { padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border: none; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .refresh-btn { position: absolute; top: 2rem; right: 2rem; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Good morning, Jack.</h1>
+    <div class="greeting">Here's what needs your attention today</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:1rem;">
+    <div class="date-badge">
+      <div class="date-month" id="dateMonth">APR</div>
+      <div class="date-day" id="dateDay">17</div>
+    </div>
+    <button class="btn-ghost" onclick="refreshBriefing()">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="grid">
+  <div>
+    <!-- Top Actions -->
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-title"><span class="dot" style="background:var(--yellow);"></span> Top 3 Actions for Today</div>
+      <div class="action-item">
+        <div class="action-num">1</div>
+        <div class="action-text"><strong>Call Sarah Mitchell</strong> — scored 9/10, interested in the new listing at 8921 Granite Ave. Says she's ready to make an offer if the price is right. Call before 2 PM.</div>
+      </div>
+      <div class="action-item">
+        <div class="action-num">2</div>
+        <div class="action-text"><strong>Review CMA for 445 Oak Lane</strong> — Investment Analyst finished the report. List price suggestion: $438K-$452K. Send to the Johnsons by noon.</div>
+      </div>
+      <div class="action-item">
+        <div class="action-num">3</div>
+        <div class="action-text"><strong>Follow up with the Bergstroms</strong> — inspection is in 3 days. Make sure they've hired an inspector. Also confirm financing is on track.</div>
+      </div>
+    </div>
+
+    <!-- Active Deals -->
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-title"><span class="dot" style="background:var(--accent2);"></span> Active Deals</div>
+      <div class="deal-item">
+        <span class="deal-stage stage-closing">Closing Apr 22</span>
+        <div class="deal-info">
+          <div class="deal-address">1247 Sagebrush Dr, Tea SD</div>
+          <div class="deal-meta">Buyer: Mike & Jennifer Thompson • Financing: Pending</div>
+        </div>
+        <div class="deal-price">$387,500</div>
+      </div>
+      <div class="deal-item">
+        <span class="deal-stage stage-inspect">Inspection Apr 20</span>
+        <div class="deal-info">
+          <div class="deal-address">445 Oak Lane, Sioux Falls</div>
+          <div class="deal-meta">Buyer: The Johnson Family • Appraisal: Apr 18</div>
+        </div>
+        <div class="deal-price">$449,000</div>
+      </div>
+      <div class="deal-item">
+        <span class="deal-stage stage-offer">Offer Pending</span>
+        <div class="deal-info">
+          <div class="deal-address">3102 W. Tapestry Dr, SF</div>
+          <div class="deal-meta">Seller: Kurt & Amy Bruns • Buyer counter due today</div>
+        </div>
+        <div class="deal-price">$512,000</div>
+      </div>
+    </div>
+
+    <!-- Hot Leads -->
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--red);"></span> Hot Leads</div>
+      <div class="lead-item">
+        <div class="lead-score score-high">9</div>
+        <div class="lead-info">
+          <div class="lead-name">Sarah Mitchell</div>
+          <div class="lead-detail">Sioux Falls 57108 • Looking 4BR+ in $350K-$450K range</div>
+        </div>
+        <div class="lead-action">→ Call now</div>
+      </div>
+      <div class="lead-item">
+        <div class="lead-score score-high">8</div>
+        <div class="lead-info">
+          <div class="lead-name">David & Lisa Peterson</div>
+          <div class="lead-detail">Tea SD 57064 • Relocating from MN, need 5BR by June</div>
+        </div>
+        <div class="lead-action">→ Schedule</div>
+      </div>
+      <div class="lead-item">
+        <div class="lead-score score-mid">6</div>
+        <div class="lead-info">
+          <div class="lead-name">Robert Chen</div>
+          <div class="lead-detail">First-time buyer • Pre-approved $320K • SF 57105</div>
+        </div>
+        <div class="lead-action">→ Send listings</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <!-- Market Pulse -->
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-title"><span class="dot" style="background:var(--accent);"></span> Market Pulse — Sioux Falls</div>
+      <div class="weather">
+        <div class="weather-icon">☀️</div>
+        <div>
+          <div class="weather-temp">62°F</div>
+          <div class="weather-desc">Sioux Falls, SD • Clear</div>
+        </div>
+      </div>
+      <div class="market-row"><span class="market-label">Active Listings</span><span class="market-value" style="color:var(--accent);">247</span></div>
+      <div class="market-row"><span class="market-label">New Today</span><span class="market-value">8</span></div>
+      <div class="market-row"><span class="market-label">Avg DOM</span><span class="market-value">34 days</span></div>
+      <div class="market-row"><span class="market-label">SP/LP Ratio</span><span class="market-value" style="color:var(--accent);">98.2%</span></div>
+      <div class="market-row"><span class="market-label">Price Changes</span><span class="market-value" style="color:var(--yellow);">6 drops</span></div>
+    </div>
+
+    <!-- Nourish -->
+    <div class="card" style="margin-bottom:1.5rem;">
+      <div class="card-title"><span class="dot" style="background:var(--purple);"></span> SOI Nurture Today</div>
+      <div class="nurture-item"><span class="nurture-icon">🎂</span> <strong>Tom Wilson</strong> — birthday tomorrow!</div>
+      <div class="nurture-item"><span class="nurture-icon">🏠</span> <strong>The Nguyens</strong> — anniversary in 3 days</div>
+      <div class="nurture-item"><span class="nurture-icon">📧</span> <strong>12 SOI contacts</strong> — market update ready to send</div>
+    </div>
+
+    <!-- Farm Alerts -->
+    <div class="card">
+      <div class="card-title"><span class="dot" style="background:var(--yellow);"></span> Farm Area Alerts</div>
+      <div class="market-row"><span class="market-label" style="font-size:0.8rem;">New listings</span><span class="market-value" style="color:var(--accent);font-size:0.85rem;">+3</span></div>
+      <div class="market-row"><span class="market-label" style="font-size:0.8rem;">Price drops</span><span class="market-value" style="font-size:0.85rem;">2</span></div>
+      <div class="market-row"><span class="market-label" style="font-size:0.8rem;">Expired FSBOs</span><span class="market-value" style="font-size:0.85rem;color:var(--yellow);">1</span></div>
+      <div class="market-row"><span class="market-label" style="font-size:0.8rem;">FSBO candidates</span><span class="market-value" style="font-size:0.85rem;">4</span></div>
+      <button class="btn-ghost" style="width:100%;margin-top:1rem;" onclick="window.parent.postMessage({type:'openCabinetPage',page:'/market-intel'},'*')">View Full Market Intel →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const now = new Date();
+document.getElementById('dateMonth').textContent = months[now.getMonth()];
+document.getElementById('dateDay').textContent = now.getDate();
+
+function refreshBriefing() {
+  const el = document.querySelector('.greeting');
+  el.textContent = 'Refreshing...';
+  setTimeout(() => {
+    el.textContent = "Here's what needs your attention today";
+  }, 1000);
+}
+</script>
+</body>
+</html>
