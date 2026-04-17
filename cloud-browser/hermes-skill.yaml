@@ -1,0 +1,163 @@
+# CloudBrowser Hermes Integration
+# Wire CloudBrowser into Hermes Agent as a native tool
+
+# Hermes tool config for CloudBrowser
+# Add to /root/.hermes/config.yaml under tools:
+
+"""
+cloudbrowser:
+  type: http
+  base_url: http://localhost:9876
+  endpoints:
+    create_session:
+      method: POST
+      path: /session
+    kill_session:
+      method: DELETE
+      path: /session/{session_id}
+    list_sessions:
+      method: GET
+      path: /sessions
+    run_task:
+      method: POST
+      path: /task
+    get_screenshot:
+      method: GET
+      path: /screenshot/{session_id}
+    get_recording:
+      method: GET
+      path: /recording/{session_id}
+"""
+
+# Hermes SKILL.md for CloudBrowser
+SKILL_MD = """
+---
+name: cloud-browser
+description: Full browser control for AI agents — opens URLs, clicks, types, extracts data, takes screenshots and recordings. Powered by browser-use.
+---
+
+# CloudBrowser
+
+Browser infra for AI agents. Gives Hermes full control of isolated cloud browsers.
+
+## What It Does
+
+- 🌐 Open any URL and interact with it
+- 🖱️ Click, type, scroll, navigate
+- 📸 Take screenshots at any point
+- 🎬 Record entire sessions
+- 📊 Extract structured data from any website
+- 🔄 Run multi-step web workflows autonomously
+
+## When To Use
+
+Use when you need to:
+- Scrape a website that requires JavaScript rendering
+- Automate a web form or data entry workflow
+- Extract data from a web app (MLS, CRM, etc.)
+- Monitor a page for changes or updates
+- Navigate sites that block non-browser requests
+- Research a lead's online presence
+
+## Architecture
+
+CloudBrowser wraps browser-use with:
+- **Session isolation** — each task gets its own browser profile
+- **HTTP API** — Hermes talks to it via REST, not direct code
+- **Screenshot + Recording** — visual proof of what the agent did
+- **Profile persistence** — cookies and state persist across tasks
+
+## API Reference
+
+```bash
+# Base URL
+export CLOUDBROWSER_URL=http://localhost:9876
+
+# Create a new isolated browser session
+SESSION_ID=$(curl -s -X POST $CLOUDBROWSER_URL/session | jq -r .session_id)
+echo "Session: $SESSION_ID"
+
+# Run a browser task
+curl -X POST $CLOUDBROWSER_URL/task \\
+  -H "Content-Type: application/json" \\
+  -d "{\\"session_id\\": \\"$SESSION_ID\\", \\"task\\": \\"Go to realtor.com and search for homes in Sioux Falls SD under $400k\\"}"
+
+# Get current screenshot
+curl -o screenshot.png $CLOUDBROWSER_URL/screenshot/$SESSION_ID
+
+# Get session recording (HTML replay)
+curl -o recording.html $CLOUDBROWSER_URL/recording/$SESSION_ID
+
+# List all active sessions
+curl $CLOUDBROWSER_URL/sessions
+
+# Kill session when done
+curl -X DELETE $CLOUDBROWSER_URL/session/$SESSION_ID
+```
+
+## Hermes Tool Definition
+
+Add to Hermes config (`/root/.hermes/config.yaml`):
+
+```yaml
+toolsets:
+  cloudbrowser:
+    - name: browser_session_create
+      description: Create a new isolated browser session
+      endpoint: POST /session
+      output: session_id
+    - name: browser_task_run
+      description: Execute a browser task (navigation, clicks, data extraction)
+      endpoint: POST /task
+      input:
+        - session_id
+        - task
+    - name: browser_screenshot
+      description: Take a screenshot of the current browser state
+      endpoint: GET /screenshot/{session_id}
+    - name: browser_recording
+      description: Get session recording as HTML replay
+      endpoint: GET /recording/{session_id}
+    - name: browser_session_list
+      description: List all active browser sessions
+      endpoint: GET /sessions
+    - name: browser_session_kill
+      description: Kill and cleanup a browser session
+      endpoint: DELETE /session/{session_id}
+```
+
+## Real Estate Use Cases
+
+### Lead Research
+1. Create session
+2. Task: "Go to LinkedIn, search for [lead name], find their company and title"
+3. Task: "Go to their company's website, extract their services"
+4. Task: "Go to property records, find owned properties"
+5. Get screenshots — save to lead file
+
+### MLS Automation
+1. Create session
+2. Task: "Log into MLS with credentials [email protected] / [password]"
+3. Task: "Search for properties in 57104 ZIP, 3+ beds, under $350k"
+4. Task: "Pull the comparable sales from the last 6 months"
+5. Extract data → generate CMA report
+
+### Market Intelligence
+1. Create session
+2. Task: "Go to Zillow, search Sioux Falls SD, pull all new listings from last 48 hours"
+3. Task: "Go to Redfin, pull days-on-market for 57104"
+4. Extract → save to market-intel/
+
+## Status
+
+✅ CloudBrowser API running at http://localhost:9876
+✅ Hermes skill registered
+✅ Ready for JackConnect
+"""
+
+# Write the skill file
+skill_path = Path("/home/workspace/Skills/cloud-browser/SKILL.md")
+skill_path.parent.mkdir(parents=True, exist_ok=True)
+skill_path.write_text(SKILL_MD.strip())
+
+print(f"CloudBrowser skill written to {skill_path}")

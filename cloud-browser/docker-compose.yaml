@@ -1,0 +1,34 @@
+# CloudBrowser — docker-compose.yaml
+# Hyperbrowser equivalent: isolated cloud browsers for Hermes Agent
+# Run: docker-compose up -d
+
+services:
+  cloudbrowser:
+    build: .
+    container_name: jackcloudbrowser
+    ports:
+      - "9876:9876"
+    environment:
+      - CLOUDBROWSER_PORT=9876
+      - CLOUDBROWSER_DATA=/data
+      - OLLAMA_HOST=http://host.docker.internal:11434
+    volumes:
+      - ./data:/data
+      - ./profiles:/data/profiles:ro
+    restart: unless-stopped
+    shm_size: 2gb
+    cap_add:
+      - SYS_ADMIN
+    # For full browser isolation, use this with the full Chrome/Playwright setup
+    # instead of the simple Flask server above
+
+  # Alternative: Full Playwright browser farm
+  playwright-browsers:
+    image: monkeytypeplaywright/playwright-browser:latest
+    profiles:
+      - full
+    ports:
+      - "9222:9222"
+    shm_size: 2gb
+    environment:
+      - PLAYWRIGHT_BROWSERS_PATH=/browsers
