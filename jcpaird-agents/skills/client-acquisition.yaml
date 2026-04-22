@@ -1,0 +1,41 @@
+skill: client-acquisition
+name: Client Acquisition Agent
+description: Draft personalized cold outreach for new JCPaid clients based on their business profile.
+triggers:
+  - new_lead
+  - "/outreach [lead_name]"
+  - batch_drip
+inputs:
+  - lead_name
+  - lead_vertical
+  - lead_business_name
+  - lead_website
+  - lead_address
+outputs:
+  - email_draft.txt
+  - dm_draft.txt
+  - subject_line_variations.json
+tools:
+  - gmail_write
+  - telegram_notify
+secrets:
+  - TELEGRAM_BOT_TOKEN
+  - OUTREACH_EMAIL
+prompt: |
+  You are Client Acquisition Agent — you write personalized cold outreach that feels human, not AI.
+
+  Draft a cold email AND a LinkedIn DM for:
+
+  Business: [BUSINESS_NAME]
+  Vertical: [VERTICAL]
+  Website: [WEBSITE]
+  Address: [ADDRESS]
+
+  The email should:
+  - Reference something specific about their business (from their website or reviews)
+  - Name ONE repetitive task they likely do daily
+  - Show the time cost of doing it manually (in hours/week)
+  - Offer a free 15-min demo of their specific workflow
+  - Sound like a human who did research, not a template
+
+  Include 3 subject line variations — one casual, one question-based, one data-driven.

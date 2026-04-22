@@ -246,3 +246,53 @@ echo ""
 echo "To restart services:"
 echo "  wsl.exe -e bash -c 'cd /home/solomon && ./start-all.sh'"
 echo ""
+
+# ── JCPaid Tier (Joseph's Business) ────────────────────────────────
+    "jcpaird")
+        echo ""
+        echo "📋 Installing JCPaid — AI Staffing Agency Stack..."
+        echo ""
+
+        # 7 JCPaid core agents
+        install_hermes_skill "lead-scout" \
+            "Finds businesses with automation gaps, scores AI readiness 1-10, outputs ranked lead lists" \
+            "https://raw.githubusercontent.com/jvanleur2234-glitch/jack-connect/main/jcpaird-agents/skills/lead-scout.yaml"
+
+        install_hermes_skill "client-acquisition" \
+            "Drafts personalized outreach emails/DMs, tracks open/reply rates, A/B tests copy" \
+            "https://raw.githubusercontent.com/jvanleur2234-glitch/jack-connect/main/jcpaird-agents/skills/client-acquisition.yaml"
+
+        install_hermes_skill "agent-builder" \
+            "Builds and deploys vertical-specific agent sets from templates within 24 hours of signup" \
+            "https://raw.githubusercontent.com/jvanleur2234-glitch/jack-connect/main/jcpaird-agents/skills/agent-builder.yaml"
+
+        install_hermes_skill "onboarding" \
+            "Onboards new clients — connects accounts, records first Watch Once skill, sends day-1 summary" \
+            "https://raw.githubusercontent.com/jvanleur2234-glitch/jack-connect/main/jcpaird-agents/skills/onboarding.yaml"
+
+        install_hermes_skill "billing" \
+            "Invoices, Stripe payments, MRR tracking, churn alerts, upgrade prompts" \
+            "https://raw.githubusercontent.com/jvanleur2234-glitch/jack-connect/main/jcpaird-agents/skills/billing.yaml"
+
+        install_hermes_skill "content-agent" \
+            "Generates LinkedIn/X posts with real dashboard stats, tracks lead gen per post" \
+            "https://raw.githubusercontent.com/jvanleur2234-glitch/jack-connect/main/jcpaird-agents/skills/content-agent.yaml"
+
+        install_hermes_skill "pipeline-manager" \
+            "Daily morning briefing: hot leads, demos, renewals, billing issues" \
+            "https://raw.githubusercontent.com/jvanleur2234-glitch/jack-connect/main/jcpaird-agents/skills/pipeline-manager.yaml"
+
+        install_watch_once_skill "lead-scout" "Search Google Maps for ${VERTICAL} near ${CITY}, score readiness 1-10"
+        install_watch_once_skill "outreach" "Draft personalized email to lead using their business name and specific gap"
+        install_watch_once_skill "content" "Create LinkedIn post in Buffer/Hootsuite with dashboard screenshot"
+
+        echo ""
+        echo "🎯 JCPaid stack ready."
+        echo "   Run: /pipeline — daily briefing"
+        echo "   Run: /scout restaurants near Chicago — find leads"
+        echo "   Run: /post this week — content calendar"
+        echo "   Run: /billing status — MRR dashboard"
+        echo ""
+        echo "📊 Dashboard: https://josephv.zo.space/jackconnect-dashboard"
+        echo ""
+        ;;

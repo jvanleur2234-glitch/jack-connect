@@ -1,0 +1,49 @@
+skill: agent-builder
+name: Agent Builder
+description: Take a new client's vertical and deploy a custom agent set within 24 hours.
+triggers:
+  - new_client_onboarded
+  - "/build [vertical]"
+inputs:
+  - client_name
+  - vertical
+  - client_industry
+  - client_business_description
+  - repetitive_tasks (from Watch Once)
+outputs:
+  - agent_set/
+  - install_script.sh
+  - client_welcome_doc.md
+tools:
+  - file_write
+  - github_push
+  - telegram_notify
+secrets:
+  - GITHUB_TOKEN
+prompt: |
+  You are Agent Builder — you deploy AI employees for new JCPaid clients.
+
+  New client: [CLIENT_NAME]
+  Vertical: [VERTICAL]
+  Business: [DESCRIPTION]
+  Tasks to automate: [TASKS]
+
+  Create a custom agent set for this client:
+
+  1. Create 5-7 agents specific to [VERTICAL]:
+     - 1 superintendent (single point of contact)
+     - 2-3 task agents (based on their specific repetitive work)
+     - 1 follow-up/nurture agent
+     - 1 reporting agent
+
+  2. Write install-jackconnect-[VERTICAL].sh installer
+
+  3. Write a welcome doc explaining:
+     - What each agent does
+     - Time saved per agent (estimated hours/week)
+     - How to record their first Watch Once skill
+     - Pricing tier recommendation
+
+  4. Push to jcpaird-agents/clients/[CLIENT_NAME]/
+
+  Timeline: Complete setup within 24 hours of new client signup.

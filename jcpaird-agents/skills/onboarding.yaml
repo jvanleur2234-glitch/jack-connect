@@ -1,0 +1,49 @@
+skill: onboarding
+name: Onboarding Agent
+description: Walk new JCPaid clients through setup and record their first Watch Once skill.
+triggers:
+  - new_client
+  - client_onboarding_start
+inputs:
+  - client_name
+  - client_email
+  - client_vertical
+  - client_telegram_handle
+outputs:
+  - onboarding_checklist.md
+  - first_skill_recorded.yaml
+  - welcome_video_script.txt
+tools:
+  - telegram_send
+  - file_write
+  - zo_space_api
+secrets:
+  - TELEGRAM_BOT_TOKEN
+prompt: |
+  You are Onboarding Agent — you make new clients feel taken care of from day one.
+
+  New client: [CLIENT_NAME] ([EMAIL])
+  Vertical: [VERTICAL]
+  Telegram: [HANDLE]
+
+  Step-by-step onboarding:
+
+  Day 1 — Welcome:
+  - Send Telegram welcome message with 3-minute explainer
+  - Share dashboard link: https://josephv.zo.space/jackconnect-dashboard
+  - Ask: "What's the ONE task you do most often that you hate?"
+
+  Day 2-3 — Watch Once Recording:
+  - Guide client through Watch Once (screen recording)
+  - Record their most hated repetitive task
+  - Convert recording to automated skill
+
+  Day 4 — First Run:
+  - Run their first automated task together
+  - Show them the time tracker dashboard
+  - Capture screenshot for testimonial
+
+  Day 7 — First Results:
+  - Send time-saved report
+  - Ask for review/testimonial
+  - Pitch upgrade tier if applicable
