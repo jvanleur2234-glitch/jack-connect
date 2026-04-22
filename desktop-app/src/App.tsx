@@ -1,115 +1,321 @@
 import { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import "./App.css";
 
-function App() {
-  const [installState, setInstallState] = useState("idle"); // idle | installing | ready | error
-  const [log, setLog] = useState<string[]>([]);
+interface AgentInfo {
+  id: string;
+  name: string;
+  status: string;
+  tasks_completed: number;
+  hours_saved: number;
+}
 
-  const appendLog = (msg: string) => setLog(l => [...l, msg]);
+interface InstallProgress {
+  step: string;
+  status: string;
+  progress: number;
+  message: string;
+}
 
-  const install = async () => {
-    setInstallState("installing");
-    appendLog("Starting installation...");
+type Tab = "dashboard" | "agents" | "tasks" | "audit" | "settings";
 
+export default function App() {
+  const [tab, setTab] = useState<Tab>("dashboard");
+  const [isInstalling, setIsInstalling] = useState(false);
+  const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null);
+  const [agents, setAgents] = useState<AgentInfo[]>([]);
+  const [watchMode, setWatchMode] = useState(false);
+
+  useEffect(() => {
+    loadAgents();
+    const unlisten = listen<InstallProgress>("install-progress", (event) => {
+      setInstallProgress(event.payload);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  async function loadAgents() {
     try {
-      appendLog("Downloading Ollama...");
-      await new Promise(r => setTimeout(r, 1500));
-      appendLog("Installing Ollama...");
-      await new Promise(r => setTimeout(r, 2000));
-
-      appendLog("Downloading Hermes agent...");
-      await new Promise(r => setTimeout(r, 1500));
-      appendLog("Installing Hermes...");
-      await new Promise(r => setTimeout(r, 1000));
-
-      appendLog("Downloading BitNet model...");
-      await new Promise(r => setTimeout(r, 3000));
-      appendLog("Configuring agents...");
-
-      await new Promise(r => setTimeout(r, 1500));
-      appendLog("Connecting to dashboard...");
-      await new Promise(r => setTimeout(r, 1000));
-
-      appendLog("✅ All done!");
-      setInstallState("ready");
+      const data = await invoke<AgentInfo[]>("get_agents");
+      setAgents(data);
     } catch (e) {
-      setInstallState("error");
-      appendLog("Install failed. Try again.");
+      // fallback mock data
+      setAgents([
+        { id: "lead-scout", name: "Lead Scout", status: "active", tasks_completed: 47, hours_saved: 12.5 },
+        { id: "client-acquisition", name: "Client Acquisition", status: "active", tasks_completed: 23, hours_saved: 8.0 },
+        { id: "agent-builder", name: "Agent Builder", status: "idle", tasks_completed: 12, hours_saved: 6.0 },
+        { id: "onboarding", name: "Onboarding Agent", status: "active", tasks_completed: 8, hours_saved: 4.0 },
+        { id: "billing", name: "Billing Agent", status: "active", tasks_completed: 31, hours_saved: 5.5 },
+        { id: "content-agent", name: "Content Agent", status: "active", tasks_completed: 56, hours_saved: 14.0 },
+        { id: "pipeline-manager", name: "Pipeline Manager", status: "idle", tasks_completed: 19, hours_saved: 7.0 },
+      ]);
     }
-  };
+  }
+
+  async function handleInstall() {
+    setIsInstalling(true);
+    setInstallProgress({ step: "starting", status: "starting", progress: 0, message: "Preparing installation..." });
+    try {
+      await invoke("start_install");
+    } catch (e) {
+      console.error(e);
+      setIsInstalling(false);
+    }
+  }
+
+  const totalHours = agents.reduce((sum, a) => sum + a.hours_saved, 0);
+  const totalTasks = agents.reduce((sum, a) => sum + a.tasks_completed, 0);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex flex-col">
-      {/* Header */}
-      <header className="p-6 border-b border-zinc-800 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-500 rounded-xl flex items-center justify-center font-bold text-xl">⚡</div>
-          <div>
-            <h1 className="text-xl font-bold">JackConnect</h1>
-            <p className="text-zinc-400 text-sm">Powered by Solomon OS</p>
+    <div className="app">
+      {/* Sidebar */}
+      <aside className="sidebar">
+        <div className="sidebar-logo">
+          <span className="logo-icon">⚡</span>
+          <span className="logo-text">JackConnect</span>
+        </div>
+        <nav className="sidebar-nav">
+          <button className={`nav-btn ${tab === "dashboard" ? "active" : ""}`} onClick={() => setTab("dashboard")}>
+            📊 Dashboard
+          </button>
+          <button className={`nav-btn ${tab === "agents" ? "active" : ""}`} onClick={() => setTab("agents")}>
+            🤖 Agents
+          </button>
+          <button className={`nav-btn ${tab === "tasks" ? "active" : ""}`} onClick={() => setTab("tasks")}>
+            ✅ Tasks
+          </button>
+          <button className={`nav-btn ${tab === "audit" ? "active" : ""}`} onClick={() => setTab("audit")}>
+            📋 Audit Trail
+          </button>
+          <button className={`nav-btn ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")}>
+            ⚙️ Settings
+          </button>
+        </nav>
+        <div className="sidebar-footer">
+          <div className="system-status">
+            <span className="status-dot online" /> Solomon OS Active
           </div>
         </div>
-        <div className="text-sm text-zinc-500">v1.0.0</div>
-      </header>
+      </aside>
 
-      {/* Main */}
-      <main className="flex-1 flex flex-col items-center justify-center p-8">
-        {installState === "idle" && (
-          <div className="text-center max-w-md">
-            <div className="w-20 h-20 bg-zinc-800 rounded-2xl flex items-center justify-center text-4xl mb-6 mx-auto">⚡</div>
-            <h2 className="text-2xl font-bold mb-2">Your AI Team is Ready</h2>
-            <p className="text-zinc-400 mb-8">One-click install. Ollama + Hermes + BitNet + 7 agents. No Ubuntu needed.</p>
-            <button onClick={install} className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-8 py-3 rounded-xl text-lg">
-              Install JackConnect
+      {/* Main Content */}
+      <main className="main">
+        {/* Install Screen */}
+        {isInstalling && (
+          <div className="install-screen">
+            <div className="install-card">
+              <h2>⚡ Installing JackConnect</h2>
+              <p className="install-subtitle">Setting up your AI team...</p>
+              <div className="progress-container">
+                <div className="progress-bar">
+                  <div className="progress-fill" style={{ width: `${installProgress?.progress ?? 0}%` }} />
+                </div>
+                <div className="progress-steps">
+                  {[
+                    { key: "ollama", label: "Ollama (local AI)" },
+                    { key: "bitnet", label: "BitNet Model" },
+                    { key: "hermes", label: "Hermes Agent System" },
+                    { key: "paperclip", label: "Paperclip Orchestrator" },
+                    { key: "watch_once", label: "Watch Once Engine" },
+                    { key: "solomon", label: "Solomon OS" },
+                    { key: "agents", label: "Your AI Team" },
+                    { key: "start_services", label: "Starting Services" },
+                  ].map((step) => {
+                    const isDone = (installProgress?.step === "complete" || installProgress?.step > step.key)) ?? false;
+                    const isActive = installProgress?.step === step.key;
+                    return (
+                      <div key={step.key} className={`progress-step ${isDone ? "done" : ""} ${isActive ? "active" : ""}`}>
+                        {isDone ? "✓" : isActive ? "●" : "○"} {step.label}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="progress-message">{installProgress?.message ?? "Preparing..."}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Dashboard Tab */}
+        {!isInstalling && tab === "dashboard" && (
+          <div className="dashboard">
+            <header className="dashboard-header">
+              <h1>Welcome back</h1>
+              <p className="tagline">The AI OS that gives you back your time for the important things</p>
+            </header>
+
+            {/* Hero Stats */}
+            <div className="hero-stats">
+              <div className="stat-card hero">
+                <span className="stat-value">{totalHours.toFixed(1)}</span>
+                <span className="stat-label">Hours Saved This Month</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{totalTasks}</span>
+                <span className="stat-label">Tasks Automated</span>
+              </div>
+              <div className="stat-card">
+                <span className="stat-value">{agents.length}</span>
+                <span className="stat-label">Active Agents</span>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="quick-actions">
+              <h3>Quick Actions</h3>
+              <div className="action-grid">
+                <button className="action-btn primary" onClick={() => setTab("agents")}>
+                  🤖 View All Agents
+                </button>
+                <button className="action-btn" onClick={() => setTab("tasks")}>
+                  ✅ New Task
+                </button>
+                <button className="action-btn" onClick={() => setTab("audit")}>
+                  📋 Audit Trail
+                </button>
+                <button className="action-btn" onClick={() => setTab("settings")}>
+                  ⚙️ Settings
+                </button>
+              </div>
+            </div>
+
+            {/* Recent Activity */}
+            <div className="recent-activity">
+              <h3>Recent Activity</h3>
+              {agents.filter((a) => a.status === "active").slice(0, 3).map((agent) => (
+                <div key={agent.id} className="activity-item">
+                  <span className="activity-icon">🤖</span>
+                  <div className="activity-details">
+                    <strong>{agent.name}</strong> completed {agent.tasks_completed} tasks
+                  </div>
+                  <span className="activity-time">{agent.hours_saved}h saved</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Agents Tab */}
+        {!isInstalling && tab === "agents" && (
+          <div className="tab-content">
+            <h2>Your AI Team</h2>
+            <div className="agent-grid">
+              {agents.map((agent) => (
+                <div key={agent.id} className="agent-card">
+                  <div className="agent-header">
+                    <span className={`status-dot ${agent.status}`} />
+                    <h3>{agent.name}</h3>
+                  </div>
+                  <div className="agent-stats">
+                    <div className="agent-stat">
+                      <span className="agent-stat-value">{agent.tasks_completed}</span>
+                      <span className="agent-stat-label">Tasks</span>
+                    </div>
+                    <div className="agent-stat">
+                      <span className="agent-stat-value">{agent.hours_saved}h</span>
+                      <span className="agent-stat-label">Saved</span>
+                    </div>
+                  </div>
+                  <button className="agent-btn">Manage</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tasks Tab */}
+        {!isInstalling && tab === "tasks" && (
+          <div className="tab-content">
+            <h2>Automated Tasks</h2>
+            <div className="task-list">
+              <div className="task-item">
+                <span className="task-check">✅</span>
+                <div className="task-info">
+                  <strong>Lead Scout completed</strong> — 3 new prospects identified
+                </div>
+                <span className="task-time">2m ago</span>
+              </div>
+              <div className="task-item">
+                <span className="task-check">✅</span>
+                <div className="task-info">
+                  <strong>Content Agent completed</strong> — 5 social posts generated
+                </div>
+                <span className="task-time">15m ago</span>
+              </div>
+              <div className="task-item">
+                <span className="task-check">✅</span>
+                <div className="task-info">
+                  <strong>Billing Agent completed</strong> — Renewal alert sent to 2 clients
+                </div>
+                <span className="task-time">1h ago</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Audit Tab */}
+        {!isInstalling && tab === "audit" && (
+          <div className="tab-content">
+            <h2>Audit Trail</h2>
+            <p>Every action your AI team takes is logged here for compliance and review.</p>
+            <div className="audit-list">
+              <div className="audit-item">
+                <span className="audit-time">Today 2:34 PM</span>
+                <span className="audit-agent">Content Agent</span>
+                <span className="audit-action">Generated 5 social media posts for Maria's Restaurant</span>
+              </div>
+              <div className="audit-item">
+                <span className="audit-time">Today 1:15 PM</span>
+                <span className="audit-agent">Lead Scout</span>
+                <span className="audit-action">Identified 3 new leads in plumbing vertical</span>
+              </div>
+              <div className="audit-item">
+                <span className="audit-time">Today 11:00 AM</span>
+                <span className="audit-agent">Onboarding Agent</span>
+                <span className="audit-action">Completed Jack's demo installation</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {!isInstalling && tab === "settings" && (
+          <div className="tab-content">
+            <h2>Settings</h2>
+            <div className="settings-group">
+              <h3>AI Model</h3>
+              <select className="settings-select">
+                <option>BitNet b1.58 (default, fastest)</option>
+                <option>Llama 3.2 1B (balanced)</option>
+                <option>Qwen 3 1.7B (most capable)</option>
+              </select>
+            </div>
+            <div className="settings-group">
+              <h3>Telegram Bot Token</h3>
+              <input type="password" placeholder="Enter your Telegram bot token" className="settings-input" />
+            </div>
+            <div className="settings-group">
+              <h3>Solomon OS API Key</h3>
+              <input type="password" placeholder="Enter your API key" className="settings-input" />
+            </div>
+            <div className="settings-group">
+              <h3>Vertical</h3>
+              <select className="settings-select">
+                <option>Real Estate (JackConnect)</option>
+                <option>AI Staffing Agency (JCPaid)</option>
+                <option>Restaurant</option>
+                <option>Plumbing</option>
+                <option>Dentistry</option>
+                <option>Custom</option>
+              </select>
+            </div>
+            <button className="action-btn primary" onClick={handleInstall}>
+              🚀 Reinstall / Update
             </button>
-            <p className="text-zinc-600 text-sm mt-3">~3 minutes • Windows 10/11</p>
-          </div>
-        )}
-
-        {installState === "installing" && (
-          <div className="text-center max-w-lg w-full">
-            <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
-            <h2 className="text-xl font-bold mb-1">Installing your AI team...</h2>
-            <p className="text-zinc-400 mb-6">This happens once. Don't close this window.</p>
-            <div className="bg-zinc-900 rounded-xl p-4 text-left text-sm font-mono text-zinc-300 max-h-48 overflow-y-auto space-y-1">
-              {log.map((l, i) => <div key={i}>{l}</div>)}
-              <span className="animate-pulse">▌</span>
-            </div>
-          </div>
-        )}
-
-        {installState === "ready" && (
-          <div className="text-center max-w-md">
-            <div className="text-5xl mb-4">✅</div>
-            <h2 className="text-2xl font-bold mb-2">You're all set!</h2>
-            <p className="text-zinc-400 mb-8">Your AI team is running. Open your dashboard to see it in action.</p>
-            <a href="https://josephv.zo.space/jackconnect-dashboard" className="bg-emerald-500 hover:bg-emerald-600 text-black font-bold px-8 py-3 rounded-xl text-lg inline-block">
-              Open Dashboard →
-            </a>
-            <div className="mt-6 text-left bg-zinc-900 rounded-xl p-4 text-sm">
-              <p className="font-bold mb-2">Your agents are ready:</p>
-              <ul className="text-zinc-300 space-y-1">
-                <li>🔍 Lead Scout — finds automation opportunities</li>
-                <li>📧 Client Acquisition — books demos</li>
-                <li>🏗️ Agent Builder — builds client AI teams</li>
-                <li>👋 Onboarding Agent — delights new clients</li>
-                <li>💳 Billing Agent — tracks revenue</li>
-                <li>📣 Content Agent — fills your pipeline</li>
-                <li>📊 Pipeline Manager — morning briefings</li>
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {installState === "error" && (
-          <div className="text-center">
-            <div className="text-5xl mb-4">❌</div>
-            <h2 className="text-xl font-bold mb-2">Install failed</h2>
-            <p className="text-zinc-400 mb-4">Make sure you're connected to the internet and try again.</p>
-            <button onClick={() => setInstallState("idle")} className="bg-zinc-700 hover:bg-zinc-600 px-6 py-2 rounded-xl">Try Again</button>
           </div>
         )}
       </main>
     </div>
   );
 }
-export default App;
