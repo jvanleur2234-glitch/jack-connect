@@ -4,6 +4,21 @@
 
 ---
 
+## The Business Model
+
+JCPaid sells AI employee agencies to ANY vertical — restaurants, plumbers, dentists, chiropractors, salons, etc.
+
+For each vertical:
+1. We deploy a JackConnect-style install with vertical-specific agents
+2. Client records Watch Once skills → automation kicks in
+3. They pay $99-499/month depending on tier
+4. Dashboard shows time saved = selling point
+
+**Copy-and-train model:**
+The hard part (BitNet + Paperclip + Solomon OS + Watch Once + Dashboard) is DONE. New vertical = swap the 7 agents + train on vertical-specific workflows.
+
+---
+
 ## The 7 Core Agents
 Every JCPaid installation runs these agents.
 
