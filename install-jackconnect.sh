@@ -54,6 +54,40 @@ fi
 
 echo -e "${GREEN}✅ WSL2 + Ubuntu detected${NC}"
 
+# ── Auto-detect hardware + select best models ──
+echo -e "${YELLOW}[3b/8] Detecting hardware...${NC}"
+RAM_GB=$(free -g 2>/dev/null | awk '/^Mem:/ {print $2}' || echo "8")
+
+if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
+    GPU_MODEL=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 || echo "unknown")
+    VRAM_GB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader 2>/dev/null | awk '{print int($1/1024)}' || echo "0")
+    echo -e "${GREEN}  ✓ Detected: ${RAM_GB}GB RAM, NVIDIA ${GPU_MODEL} (${VRAM_GB}GB VRAM)${NC}"
+else
+    VRAM_GB=0
+    echo -e "${GREEN}  ✓ Detected: ${RAM_GB}GB RAM, no discrete GPU (CPU mode)${NC}"
+fi
+
+# Tier-based model selection (Qwen3.6-27B = Claude Code-level, 27B runs on laptop!)
+echo -e "${YELLOW}[3c/8] Selecting best models for your hardware...${NC}"
+if [ ! -z "$VRAM_GB" ] && [ "$VRAM_GB" -ge 24 ]; then
+    CODING_MODEL="qwen3.6-27b"
+    AGENT_MODEL="qwen3.5-72b-a17b"
+    echo -e "${GREEN}  🎯 Coding agent: Qwen3.6-27B (Claude Code-level, 27B params — runs on your laptop!)${NC}"
+elif [ ! -z "$VRAM_GB" ] && [ "$VRAM_GB" -ge 16 ]; then
+    CODING_MODEL="qwen3.5-14b"
+    AGENT_MODEL="qwen3.5-32b"
+    echo -e "${GREEN}  🎯 Coding agent: Qwen3.5-14B${NC}"
+elif [ ! -z "$VRAM_GB" ] && [ "$VRAM_GB" -ge 10 ]; then
+    CODING_MODEL="qwen3.5-8b"
+    AGENT_MODEL="qwen3.5-14b"
+    echo -e "${GREEN}  🎯 Coding agent: Qwen3.5-8B${NC}"
+else
+    CODING_MODEL="qwen3.5-3b"
+    AGENT_MODEL="qwen3.5-8b"
+    echo -e "${GREEN}  🎯 Coding agent: Qwen3.5-3B (lightweight mode)${NC}"
+fi
+echo ""
+
 # ── Update Ubuntu ───────────────────────────────────────────────────
 echo -e "${YELLOW}[2/8] Updating Ubuntu packages...${NC}"
 wsl.exe -e bash -c "sudo apt-get update -qq && sudo apt-get upgrade -y -qq" 2>/dev/null
