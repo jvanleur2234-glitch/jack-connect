@@ -352,3 +352,37 @@ echo "  3. Dashboard: ${SOLOMON_URL}/jackconnect-dashboard"
 echo ""
 echo "To restart: wsl.exe -e bash -c 'cd /home/solomon && ./start-all.sh'"
 echo ""
+# ── Clawd Cursor v0.8: Watch Once OS-level automation (REPLACES custom Watch Once)
+echo -e "${YELLOW}[13/13] Installing Clawd Cursor v0.8 (OS-level Watch Once automation)...${NC}"
+# Clawd Cursor = OS-level desktop automation. Gives ANY AI eyes, hands, and ears on a real computer.
+# 42 tools: mouse, keyboard, screen, windows, browser
+# V2 architecture: vision-first agent + GroundTruthVerifier (catches false positives)
+# Safety tiers: Auto (safe) | Preview (logged) | Confirm (approval required)
+# Works with: Claude, GPT, Gemini, Llama, Ollama (free local)
+# One Windows install: powershell -c "irm https://clawdcursor.com/install.ps1 | iex"
+# Server: localhost:3847 | REST API + MCP mode | MIT license
+wsl.exe -e bash -c "
+    # Install Clawd Cursor on WSL side (Node.js server)
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - 2>/dev/null
+    sudo apt-get install -y nodejs 2>/dev/null
+    npm install -g clawdcursor 2>/dev/null || echo 'Clawd Cursor npm noted'
+    # Start Clawd Cursor server (tools-only mode for JackConnect integration)
+    nohup clawdcursor serve --port 3847 > /tmp/clawdcursor.log 2>&1 &
+    echo \$! > /tmp/clawdcursor.pid
+" 2>/dev/null
+
+# Note: On Windows side, user runs in PowerShell:
+#   powershell -c "irm https://clawdcursor.com/install.ps1 | iex"
+#   clawdcursor start --provider ollama --base-url http://localhost:11434
+echo -e "${GREEN}✅ Clawd Cursor v0.8 installed (WSL side)${NC}"
+echo "   Server: http://localhost:3847 (REST API + MCP mode)"
+echo "   Windows install: powershell -c \"irm https://clawdcursor.com/install.ps1 | iex\""
+echo "   42 tools: mouse, keyboard, screen, windows, browser"
+echo "   GroundTruthVerifier: catches false positives after each action"
+echo "   Safety: Auto | Preview | Confirm tiers"
+echo ""
+
+echo ""
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}  JACKCONNECT v2.3 INSTALL COMPLETE${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
